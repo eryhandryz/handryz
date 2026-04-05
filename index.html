@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+<meta charset="UTF-8">
+<title>Sistem Senarai Kenderaan Koporat Perodua</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+<style>
+body{margin:0;padding:20px;font-family:'Poppins',sans-serif;min-height:100vh;display:flex;justify-content:center;align-items:flex-start;background: linear-gradient(135deg, #a8edea, #fed6e3, #f6d365, #fda085);background-size:400% 400%;animation:gradientBG 20s ease infinite;}
+@keyframes gradientBG {0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+.container{width:90%; max-width:900px; background: rgba(255,255,255,0.85); backdrop-filter: blur(10px); border-radius:20px; padding:30px; box-shadow:0 8px 30px rgba(0,0,0,0.3); color:#0f2027;}
+h2{text-align:center;margin-bottom:25px;font-weight:600;letter-spacing:1px;color:#0f2027;}
+input{width:calc(33% - 12px);padding:12px;margin:6px;border-radius:10px;border:1px solid rgba(0,0,0,0.2);background: rgba(255,255,255,0.9);color:#0f2027;outline:none;transition:0.3s;}
+input::placeholder{ color: rgba(0,0,0,0.5); }
+input:focus{ border:1px solid #2196f3; background: rgba(255,255,255,0.95); }
+button{ padding:12px 20px;margin:6px;border:none;border-radius:10px;background: linear-gradient(45deg,#4facfe,#00f2fe); color:#0f2027; font-weight:600; cursor:pointer; transition:0.3s;}
+button:hover{opacity:0.9; transform: translateY(-2px);}
+#table{ width:100%; margin-top:20px; display:flex; flex-wrap:wrap; gap:15px; justify-content:flex-start;}
+#table li{list-style:none; background: rgba(255,255,255,0.85); backdrop-filter: blur(8px); border-radius:15px; padding:12px; width:150px; box-shadow:0 4px 15px rgba(0,0,0,0.1); display:flex; flex-direction:column; align-items:center; transition:0.3s; cursor:pointer; position:relative;}
+#table li:hover{ transform: translateY(-3px); box-shadow:0 6px 20px rgba(0,0,0,0.2); }
+#table li img{ width:100px; height:100px; object-fit:cover; border-radius:12px; margin-bottom:8px; }
+#table li .info{ text-align:center; display:flex; flex-direction:column; gap:4px; }
+#table li .info span{ font-weight:500; font-size:14px; color:#0f2027; }
+.editBtn{ position:absolute; top:5px; right:5px; padding:4px 8px; font-size:12px; background:#ffb74d; border:none; border-radius:6px; cursor:pointer; color:#0f2027; font-weight:600; transition:0.2s; }
+.editBtn:hover{opacity:0.9;}
+.deleteBtn{ margin-top:5px; padding:4px 8px; font-size:12px; background:#e53935; border:none; border-radius:6px; cursor:pointer; color:#fff; font-weight:600; transition:0.2s; }
+.deleteBtn:hover{opacity:0.9;}
+#popup{ position:fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.7); display:none; justify-content:center; align-items:center; z-index:1000; }
+#popupContent{ background: rgba(255,255,255,0.95); padding:30px; border-radius:20px; text-align:center; max-width:400px; position:relative; }
+#popupContent img{ width:200px; height:200px; object-fit:cover; border-radius:15px; margin-bottom:15px; }
+#popupContent span{ display:block; font-size:18px; font-weight:600; margin:5px 0; color:#0f2027; }
+#closePopup{ position:absolute; top:10px; right:15px; font-size:24px; font-weight:bold; cursor:pointer; color:#0f2027; }
+.search{ width:calc(33% - 12px); padding:12px; border-radius:10px; border:1px solid rgba(0,0,0,0.2); background: rgba(255,255,255,0.9); color:#0f2027; margin-bottom:12px; }
+.search::placeholder{color: rgba(0,0,0,0.5);}
+</style>
+</head>
+<body>
+
+<div class="container">
+<h2>Sistem Senarai Kenderaan</h2>
+
+<!-- Admin Input -->
+<div id="adminPanel">
+<input type="text" id="nama" placeholder="Nama">
+<input type="text" id="plat" placeholder="No Plat Kenderaan">
+<input type="file" id="gambar">
+<input type="password" id="addKey" placeholder="Kata Kunci Tambah Rekod">
+<button onclick="tambahData()">Tambah Rekod</button>
+</div>
+
+<br><br>
+
+<!-- Search -->
+<input type="text" id="search" class="search" placeholder="Carian Nama / No Plat" onkeyup="searchTable()">
+
+<ul id="table"></ul>
+</div>
+
+<!-- Popup -->
+<div id="popup">
+<div id="popupContent">
+<span id="closePopup">&times;</span>
+<img src="" id="popupImg">
+<span id="popupNama"></span>
+<span id="popupPlat"></span>
+</div>
+</div>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyB3KJfqTeN7iDzPCI5u5wZj8DcnitWUwPQ",
+  authDomain: "kenderaan-pengurusan-koporat.firebaseapp.com",
+  projectId: "kenderaan-pengurusan-koporat",
+  storageBucket: "kenderaan-pengurusan-koporat.firebasestorage.app",
+  messagingSenderId: "919290675358",
+  appId: "1:919290675358:web:095a0993c8a560a7a9fb8f",
+  measurementId: "G-NQCHBPCGYP"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+// 🔹 Load data realtime
+window.onload = function(){
+  db.collection("kendaraan").orderBy("timestamp","desc").onSnapshot(snapshot=>{
+    document.getElementById("table").innerHTML = "";
+    snapshot.forEach(doc=>{
+      addCardFromDB(doc.data(), doc.id);
+    });
+  });
+}
+
+// 🔹 Tambah data (admin)
+function tambahData(){
+  let nama = document.getElementById("nama").value;
+  let plat = document.getElementById("plat").value;
+  let gambar = document.getElementById("gambar").files[0];
+  let addKey = document.getElementById("addKey").value;
+
+  if(addKey !== "5313"){ alert("Kata kunci tambah rekod salah"); return; }
+  if(!nama || !plat || !gambar){ alert("Sila isi semua maklumat"); return; }
+
+  let reader = new FileReader();
+  reader.onload = function(e){
+    let newItem = {nama:nama, plat:plat, img:e.target.result, timestamp:firebase.firestore.FieldValue.serverTimestamp()};
+    db.collection("kendaraan").add(newItem);
+  }
+  reader.readAsDataURL(gambar);
+
+  document.getElementById("nama").value="";
+  document.getElementById("plat").value="";
+  document.getElementById("gambar").value="";
+  document.getElementById("addKey").value="";
+}
+
+// 🔹 Add card to UI
+function addCardFromDB(item, id){
+  let table = document.getElementById("table");
+  let li = document.createElement("li");
+
+  li.innerHTML = `<img src='${item.img}'><div class='info'><span>${item.nama}</span><span>${item.plat}</span></div>`;
+
+  // Jika admin panel ada, tambahkan button edit/delete
+  if(document.getElementById("adminPanel")){
+    li.innerHTML += `<button class='editBtn'>Edit</button><button class='deleteBtn'>Padam</button>`;
+    li.querySelector('.editBtn').onclick = function(ev){
+      ev.stopPropagation();
+      let newNama = prompt("Kemaskini Nama:", li.querySelector('.info span:nth-child(1)').textContent);
+      let newPlat = prompt("Kemaskini No Plat:", li.querySelector('.info span:nth-child(2)').textContent);
+      if(newNama!==null && newPlat!==null){
+        db.collection("kendaraan").doc(id).update({nama:newNama, plat:newPlat});
+      }
+    }
+    li.querySelector('.deleteBtn').onclick = function(ev){
+      ev.stopPropagation();
+      if(confirm("Padam rekod ini?")){
+        db.collection("kendaraan").doc(id).delete();
+      }
+    }
+  }
+
+  li.querySelector('img').onclick = li.querySelector('.info').onclick = function(){
+    openPopup(li.querySelector('img').src, li.querySelector('.info span:nth-child(1)').textContent, li.querySelector('.info span:nth-child(2)').textContent)
+  }
+
+  table.insertBefore(li, table.firstChild);
+}
+
+// 🔹 Popup
+function openPopup(imgSrc, nama, plat){
+  document.getElementById("popupImg").src = imgSrc;
+  document.getElementById("popupNama").textContent = nama;
+  document.getElementById("popupPlat").textContent = plat;
+  document.getElementById("popup").style.display="flex";
+}
+document.getElementById("closePopup").onclick = function(){ document.getElementById("popup").style.display="none"; }
+
+// 🔹 Search
+function searchTable(){
+  let input=document.getElementById("search").value.toLowerCase();
+  let cards=document.getElementById("table").getElementsByTagName("li");
+  for(let i=0;i<cards.length;i++){
+    let info=cards[i].getElementsByClassName("info")[0];
+    let spans=info.getElementsByTagName("span");
+    let name=spans[0].textContent.toLowerCase();
+    let plat=spans[1].textContent.toLowerCase();
+    cards[i].style.display = (name.includes(input) || plat.includes(input)) ? "" : "none";
+  }
+}
+</script>
+</body>
+</html>
